@@ -1,6 +1,8 @@
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
+// Auth-scoped client — respects RLS, tied to the requesting user's session.
 export async function createSupabaseServerClient() {
   const cookieStore = await cookies();
   return createServerClient(
@@ -16,5 +18,13 @@ export async function createSupabaseServerClient() {
         },
       },
     }
+  );
+}
+
+// Service-role client — bypasses RLS. Use only in trusted server-side routes.
+export function createSupabaseServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 }
