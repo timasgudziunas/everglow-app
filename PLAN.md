@@ -52,7 +52,7 @@ The GATT profile must be finalized and agreed between the firmware engineer and 
 - [x] Scaffold React Native + Expo project
 - [x] Set up Supabase (auth, database schema for users and partner links)
 - [x] Scaffold Next.js backend on Vercel
-- [ ] Basic account creation and login on mobile
+- [x] Basic account creation and login on mobile
 
 ### Phase 2 — Hardware connection
 - [ ] BLE scan, pair, and connect to bracelet

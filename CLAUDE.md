@@ -4,113 +4,127 @@ Paired wearable bracelet app. One partner's heartbeat is read by a PPG sensor in
 
 ---
 
-## Monorepo structure
+## Build status
+
+| Phase | Status | Covers |
+|-------|--------|--------|
+| Phase 1 — Skeleton | ✅ Done | Supabase auth, login/signup on mobile, API scaffold |
+| Phase 2 — Hardware | ⬜ Next | BLE scan, GATT pairing, beat event reception from bracelet |
+| Phase 3 — Partner sync | ⬜ | Invite codes, Ably/Pusher relay, bidirectional beat flow |
+| Phase 4 — Home screen | ⬜ | Animated heartbeat ring, BPM display, wearing states |
+| Phase 5 — Polish | ⬜ | Full onboarding flow, iOS background execution, quiet hours |
+
+**Hard blocker before Phase 2:** The GATT profile (service UUID, beat-event characteristic byte layout, light-command characteristic) must be agreed with the firmware engineer. UUIDs in `apps/mobile/lib/ble.ts` are `TODO` placeholders.
+
+---
+
+## Monorepo layout
 
 ```
 everglow-app/
 ├── apps/
-│   ├── mobile/          # React Native + Expo (iOS first)
-│   └── api/             # Next.js on Vercel (backend API)
+│   ├── mobile/          # React Native + Expo — the user-facing iOS app
+│   └── api/             # Next.js on Vercel — partner linking and beat relay
 ├── packages/
-│   └── shared/          # Shared TypeScript types (BeatEvent, WearingState, etc.)
-├── PLAN.md              # Full product plan and build phases
+│   └── shared/          # Shared TS types: BeatEvent, WearingState, PartnerLink
+├── supabase/
+│   └── migrations/      # SQL run against the remote Supabase project
+├── .env.example         # Reference for all env vars across both apps
+├── PLAN.md              # Full product plan and feature detail
 └── CLAUDE.md            # This file
 ```
 
 ---
 
-## Apps
+## apps/mobile
 
-### `apps/mobile` — React Native + Expo
+**Entry:** `expo-router/entry` → `app/_layout.tsx`
 
-**Entry point:** `expo-router/entry` (file-based routing, like Next.js App Router)
+**Auth flow (Phase 1):**
+- `lib/auth.tsx` — `SessionProvider` wraps the whole app (root `_layout.tsx`). Subscribes to `supabase.auth.onAuthStateChange`. Exposes `session` and `isLoading` via `useSession()`.
+- `app/(tabs)/_layout.tsx` — redirects to `/(auth)/login` when `!session`
+- `app/(auth)/_layout.tsx` — redirects to `/(tabs)` when `session` exists
+- Navigation after sign-in/sign-out is automatic — driven by session state, not explicit `router.push`.
 
-**Screen structure:**
-```
-app/
-├── _layout.tsx                    # Root navigator (Stack)
-├── onboarding/
-│   ├── _layout.tsx
-│   ├── index.tsx                  # Welcome
-│   ├── pair-bracelet.tsx          # BLE scan and pairing
-│   └── link-partner.tsx           # Invite code entry
-├── (auth)/
-│   ├── _layout.tsx
-│   ├── login.tsx
-│   └── signup.tsx
-└── (tabs)/
-    ├── _layout.tsx
-    ├── index.tsx                  # Home — animated heartbeat ring
-    └── settings.tsx               # Quiet hours, dates
-```
+**Screen map:**
+
+| Route (Expo Router) | File | Status |
+|---------------------|------|--------|
+| `/` | `app/(tabs)/index.tsx` | Placeholder — Phase 4 |
+| `/settings` | `app/(tabs)/settings.tsx` | Sign-out button — done |
+| `/login` | `app/(auth)/login.tsx` | Email/password sign-in — done |
+| `/signup` | `app/(auth)/signup.tsx` | Account creation — done |
+| `/onboarding` | `app/onboarding/index.tsx` | Welcome placeholder — Phase 5 |
+| `/onboarding/pair-bracelet` | `app/onboarding/pair-bracelet.tsx` | BLE pairing placeholder — Phase 2 |
+| `/onboarding/link-partner` | `app/onboarding/link-partner.tsx` | Invite code placeholder — Phase 3 |
 
 **Key lib files:**
-- `lib/supabase.ts` — Supabase client configured for React Native (AsyncStorage persistence)
-- `lib/ble.ts` — BleManager singleton + GATT UUID constants (placeholders until firmware is finalized)
 
-**Key dependencies:**
-- `expo-router` — file-based navigation
-- `react-native-ble-plx` — BLE scanning and GATT communication
-- `@supabase/supabase-js` — auth and database
-- `react-native-url-polyfill` — required for Supabase on React Native (imported in `app/_layout.tsx`)
+| File | Purpose |
+|------|---------|
+| `lib/supabase.ts` | Supabase client with AsyncStorage session persistence |
+| `lib/auth.tsx` | SessionProvider + `useSession()` hook |
+| `lib/ble.ts` | BleManager singleton + GATT UUID constants (all `TODO`) |
 
-**Running:**
-```
-cd apps/mobile && npm install && npx expo start
-```
-iOS only for BLE — Safari blocks Web Bluetooth entirely.
+**Empty placeholder dirs** (`.gitkeep` only — filled in later phases):
+- `components/` — reusable UI components (Phase 4: heartbeat ring, etc.)
+- `hooks/` — custom React hooks (Phase 2+: `useBLE`, etc.)
 
----
+**Run:** `cd apps/mobile && npm install && npx expo start` (iOS only — Safari blocks Web Bluetooth)
 
-### `apps/api` — Next.js on Vercel
-
-**Routes:**
-```
-app/
-├── layout.tsx
-├── page.tsx                       # Health check / landing
-└── api/
-    ├── partner/route.ts           # POST — invite code generation + partner linking
-    └── relay/route.ts             # POST — beat event relay (Ably/Pusher in Phase 3)
-```
-
-**Key lib files:**
-- `lib/supabase-server.ts` — server-side Supabase client using `@supabase/ssr`
-
-**Required env vars:**
-```
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY
-```
-
-**Running:**
-```
-cd apps/api && npm install && npm run dev
-```
+**Env:** `apps/mobile/.env` — `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`
 
 ---
 
-## `packages/shared`
+## apps/api
 
-TypeScript types shared between mobile and API:
-- `BeatEvent` — the ~8-byte unit transmitted from bracelet → phone → backend → partner's phone
-- `WearingState` — `'both' | 'you_only' | 'partner_only' | 'neither'`
-- `PartnerLink` — database row shape
+Pure API — no frontend. One health-check page, two stub routes.
+
+| Route | File | Status |
+|-------|------|--------|
+| `GET /` | `app/page.tsx` | "Everglow API — running" |
+| `POST /api/partner` | `app/api/partner/route.ts` | Stub 501 — Phase 3 |
+| `POST /api/relay` | `app/api/relay/route.ts` | Stub 501 — Phase 3 |
+
+`lib/supabase-server.ts` exports two functions:
+- `createSupabaseServerClient()` — cookie-scoped, respects RLS (use in user-facing routes)
+- `createSupabaseServiceClient()` — service role, bypasses RLS (use for admin operations)
+
+**Run:** `cd apps/api && npm install && npm run dev`
+
+**Env:** `apps/api/.env` — `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 
 ---
 
-## Critical constraint before Phase 2
+## packages/shared
 
-The GATT profile (service UUID, beat event characteristic, light command characteristic) **must be agreed with the firmware engineer** before writing any BLE code. The current UUIDs in `apps/mobile/lib/ble.ts` are placeholders.
+TypeScript types shared by both apps. Not yet added as a dependency to either app — import as `@everglow/shared` when first needed (Phase 3).
+
+| Type | Description |
+|------|-------------|
+| `BeatEvent` | `{ timestampMs, intervalMs, sequence, checksum }` — ~8 bytes, layout must match firmware |
+| `WearingState` | `'both' \| 'you_only' \| 'partner_only' \| 'neither'` |
+| `PartnerLink` | `{ id, userId, partnerId, linkedAt }` — database row shape |
 
 ---
 
-## Build phases
+## Database (Supabase)
 
-See `PLAN.md` for the full phased plan. Summary:
-- **Phase 1** (current): skeleton scaffold
-- **Phase 2**: BLE bracelet connection and beat event reception
-- **Phase 3**: partner linking and beat relay via Ably/Pusher
-- **Phase 4**: animated home screen
-- **Phase 5**: onboarding flow, iOS background execution, polish
+Migration: `supabase/migrations/20260605000001_initial_schema.sql`
+
+| Table | Purpose |
+|-------|---------|
+| `profiles` | One row per auth user. Auto-created by trigger on signup. |
+| `invite_codes` | Short-lived codes used once to link two partners (Phase 3). |
+| `partner_links` | Permanent bond between two user IDs (Phase 3). |
+
+RLS enabled on all tables. Beat events are **never stored** — they flow through Ably/Pusher in memory only.
+
+---
+
+## Root workspace scripts
+
+```bash
+npm run mobile   # expo start in apps/mobile
+npm run api      # next dev in apps/api
+```
