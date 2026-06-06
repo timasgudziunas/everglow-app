@@ -41,8 +41,18 @@ A paired wearable bracelet that reads one partner's heartbeat via a PPG sensor a
 ### Key decision: why not Next.js for the mobile app
 Next.js runs in a browser. Web Bluetooth is blocked entirely by Safari on iOS — Apple does not allow web apps to access Bluetooth hardware. Since BLE is the core mechanism of the product, a native or near-native mobile app is mandatory. React Native uses the same React mental model as Next.js (components, hooks, JSX) making it the fastest path given existing familiarity.
 
-### Hard dependency before any code is written
-The GATT profile must be finalized and agreed between the firmware engineer and the iOS engineer before either side starts building. Specifically: the base UUID, the beat event characteristic format (~8 bytes: timestamp + beat interval + sequence number + checksum), and the light command characteristic (pulse rate instruction sent from phone to bracelet).
+### GATT profile — locked 2026-06-06
+| | UUID |
+|---|---|
+| Service | `F3640001-5F4E-4B39-9A2E-7D8E1F0A3C5B` |
+| Beat event (notify) | `F3640002-5F4E-4B39-9A2E-7D8E1F0A3C5B` |
+| Light command (write-without-response) | `F3640003-5F4E-4B39-9A2E-7D8E1F0A3C5B` |
+
+Beat event — 8 bytes, little-endian: `uint32 timestampMs | uint16 intervalMs | uint8 sequence | uint8 checksum (XOR bytes 0–6)`
+
+Light command — 4 bytes, little-endian: `uint8 command (0x00 off, 0x01 pulse) | uint16 durationMs | uint8 brightness (0–255)`
+
+The firmware engineer needs only these UUIDs and byte layouts to build their side.
 
 ---
 
@@ -55,13 +65,14 @@ The GATT profile must be finalized and agreed between the firmware engineer and 
 - [x] Basic account creation and login on mobile
 
 ### Phase 2 — Hardware connection
-- [ ] BLE scan, pair, and connect to bracelet
-- [ ] Receive beat events from bracelet on the phone
-- [ ] Send light pulse commands back to bracelet
-- [ ] Verify the full bracelet ↔ phone loop works on real hardware
+- [x] Lock GATT profile (UUIDs + byte layouts — see above)
+- [x] BLE scan, pair, and connect to bracelet
+- [x] Receive beat events from bracelet on the phone
+- [x] Send light pulse commands back to bracelet
+- [ ] Verify the full bracelet ↔ phone loop works on real hardware (`hooks/useMockBLE.ts` stands in until then — swap import in `pair-bracelet.tsx`)
 
 ### Phase 3 — Partner sync and relay
-- [ ] Invite code generation and partner linking
+- [x] Invite code generation and partner linking
 - [ ] Ably/Pusher WebSocket integration on backend
 - [ ] Beat events flow from your bracelet → your phone → backend → partner's phone → partner's bracelet
 - [ ] Both directions simultaneously

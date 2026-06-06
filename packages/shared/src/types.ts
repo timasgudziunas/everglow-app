@@ -1,6 +1,6 @@
 // Beat event transmitted from bracelet → phone → backend → partner's phone → partner's bracelet.
-// ~8 bytes on the wire: timestamp (4B) + beat interval ms (2B) + sequence (1B) + checksum (1B).
-// Layout must match firmware. TODO: finalize with firmware engineer before Phase 2.
+// 8 bytes, little-endian: timestampMs (uint32) | intervalMs (uint16) | sequence (uint8) | checksum XOR (uint8).
+// Matches GATT.BEAT_EVENT_CHARACTERISTIC byte layout — firmware and app must stay in sync.
 export interface BeatEvent {
   timestampMs: number;
   intervalMs: number;
