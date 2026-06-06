@@ -9,6 +9,7 @@ import {
 import { State, Device } from 'react-native-ble-plx';
 // Swap to useBLE when testing on real hardware
 import { useMockBLE as useBLE } from '../../hooks/useMockBLE';
+import { useRelay } from '../../hooks/useRelay';
 
 export default function PairBraceletScreen() {
   const {
@@ -23,6 +24,9 @@ export default function PairBraceletScreen() {
     connectToDevice,
     sendLightCommand,
   } = useBLE();
+
+  const { relayState, lastRelayError, latestPartnerBeat } = useRelay({ latestBeat, sendLightCommand });
+  const partnerBpm = latestPartnerBeat ? Math.round(60000 / latestPartnerBeat.intervalMs) : null;
 
   const bpm = latestBeat ? Math.round(60000 / latestBeat.intervalMs) : null;
 
@@ -46,12 +50,29 @@ export default function PairBraceletScreen() {
           ) : (
             <Text style={styles.bpmWaiting}>Waiting for heartbeat…</Text>
           )}
+          {relayState === 'connected' && (
+            partnerBpm !== null ? (
+              <Text style={styles.partnerBpm}>Partner: {partnerBpm} BPM</Text>
+            ) : (
+              <Text style={styles.partnerBpmWaiting}>Waiting for partner…</Text>
+            )
+          )}
           <TouchableOpacity
             style={styles.pulseButton}
             onPress={() => sendLightCommand({ command: 0x01, durationMs: 500, brightness: 255 })}
           >
             <Text style={styles.pulseButtonText}>Send test pulse</Text>
           </TouchableOpacity>
+          <Text style={[
+            styles.relayStatus,
+            relayState === 'connected' && styles.relayConnected,
+            relayState === 'error' && styles.relayError,
+          ]}>
+            {relayState === 'idle' && 'Relay: off'}
+            {relayState === 'connecting' && 'Relay: connecting…'}
+            {relayState === 'connected' && 'Relay: live'}
+            {relayState === 'error' && `Relay: ${lastRelayError ?? 'error'}`}
+          </Text>
         </View>
       );
     }
@@ -197,6 +218,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 8,
   },
+  partnerBpm: {
+    color: '#F5A623',
+    fontSize: 20,
+    fontWeight: '600',
+    marginTop: 8,
+    opacity: 0.7,
+  },
+  partnerBpmWaiting: {
+    color: '#444444',
+    fontSize: 13,
+    marginTop: 6,
+  },
   pulseButton: {
     marginTop: 16,
     borderWidth: 1,
@@ -208,6 +241,17 @@ const styles = StyleSheet.create({
   pulseButtonText: {
     color: '#F5A623',
     fontSize: 14,
+  },
+  relayStatus: {
+    color: '#666666',
+    fontSize: 12,
+    marginTop: 10,
+  },
+  relayConnected: {
+    color: '#4CAF50',
+  },
+  relayError: {
+    color: '#FF6B6B',
   },
   list: {
     width: '100%',

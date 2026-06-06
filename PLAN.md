@@ -73,9 +73,9 @@ The firmware engineer needs only these UUIDs and byte layouts to build their sid
 
 ### Phase 3 — Partner sync and relay
 - [x] Invite code generation and partner linking
-- [ ] Ably/Pusher WebSocket integration on backend
-- [ ] Beat events flow from your bracelet → your phone → backend → partner's phone → partner's bracelet
-- [ ] Both directions simultaneously
+- [x] Ably/Pusher WebSocket integration on backend
+- [x] Beat events flow from your bracelet → your phone → backend → partner's phone → partner's bracelet
+- [x] Both directions simultaneously
 
 ### Phase 4 — Home screen
 - [ ] Animated heartbeat ring driven by live incoming beat events
