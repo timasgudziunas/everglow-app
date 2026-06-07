@@ -12,7 +12,9 @@
       "bundleIdentifier": "com.everglow.app",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "Everglow uses Bluetooth to connect to your bracelet.",
-        "UIBackgroundModes": ["bluetooth-central"]
+        "UIBackgroundModes": [
+          "bluetooth-central"
+        ]
       }
     },
     "android": {
@@ -32,10 +34,14 @@
         "react-native-ble-plx",
         {
           "isBackgroundEnabled": true,
-          "modes": ["peripheral", "central"],
+          "modes": [
+            "peripheral",
+            "central"
+          ],
           "bluetoothAlwaysPermission": "Allow Everglow to connect to your bracelet."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

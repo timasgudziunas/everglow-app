@@ -8,5 +8,8 @@
   "scripts": {
     "mobile": "npm run start --workspace=apps/mobile",
     "api": "npm run dev --workspace=apps/api"
+  },
+  "dependencies": {
+    "expo-router": "~56.2.9"
   }
 }

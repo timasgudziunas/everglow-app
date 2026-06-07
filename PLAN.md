@@ -78,9 +78,9 @@ The firmware engineer needs only these UUIDs and byte layouts to build their sid
 - [x] Both directions simultaneously
 
 ### Phase 4 — Home screen
-- [ ] Animated heartbeat ring driven by live incoming beat events
-- [ ] BPM display and connection status
-- [ ] All four wearing-state variations (both, just you, just partner, neither)
+- [x] Animated heartbeat ring driven by live incoming beat events
+- [x] BPM display and connection status
+- [x] All four wearing-state variations (both, just you, just partner, neither)
 
 ### Phase 5 — Onboarding and polish
 - [ ] Full onboarding flow (pair bracelet → create account → link partner)

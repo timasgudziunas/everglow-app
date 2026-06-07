@@ -4,6 +4,8 @@ import { bleManager, GATT } from '../lib/ble';
 
 export type ScanState = 'idle' | 'scanning' | 'connecting' | 'connected' | 'error';
 
+export type WearingState = 'both' | 'you_only' | 'partner_only' | 'neither';
+
 // Mirrors packages/shared BeatEvent — keep in sync with GATT.BEAT_EVENT_CHARACTERISTIC byte layout.
 export type BeatEvent = {
   timestampMs: number;

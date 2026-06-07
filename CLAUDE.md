@@ -11,7 +11,7 @@ Paired wearable bracelet app. One partner's heartbeat is read by a PPG sensor in
 | Phase 1 — Skeleton | ✅ Done | Supabase auth, login/signup on mobile, API scaffold |
 | Phase 2 — Hardware | ⬜ Next | BLE scan, GATT pairing, beat event reception from bracelet |
 | Phase 3 — Partner sync | ⬜ | Invite codes, Ably/Pusher relay, bidirectional beat flow |
-| Phase 4 — Home screen | ⬜ | Animated heartbeat ring, BPM display, wearing states |
+| Phase 4 — Home screen | ✅ Done | Animated heartbeat ring, BPM display, wearing states |
 | Phase 5 — Polish | ⬜ | Full onboarding flow, iOS background execution, quiet hours |
 
 **Hard blocker before Phase 2:** The GATT profile (service UUID, beat-event characteristic byte layout, light-command characteristic) must be agreed with the firmware engineer. UUIDs in `apps/mobile/lib/ble.ts` are `TODO` placeholders.

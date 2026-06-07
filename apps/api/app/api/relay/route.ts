@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ablyRest } from '../../../lib/ably';
+import { getAblyRest } from '../../../lib/ably';
 import { createSupabaseServiceClient } from '../../../lib/supabase-server';
 
 async function getAuthUser(request: NextRequest) {
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
   const partnerId = link.user_id === user.id ? link.partner_id : link.user_id;
 
-  await ablyRest.channels.get(`beats:${partnerId}`).publish('beat', body);
+  await getAblyRest().channels.get(`beats:${partnerId}`).publish('beat', body);
 
   return NextResponse.json({ ok: true });
 }
