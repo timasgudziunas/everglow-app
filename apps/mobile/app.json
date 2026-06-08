@@ -13,6 +13,7 @@
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "Everglow uses Bluetooth to connect to your bracelet.",
         "UIBackgroundModes": [
+          "remote-notification",
           "bluetooth-central"
         ]
       }
@@ -41,7 +42,8 @@
           "bluetoothAlwaysPermission": "Allow Everglow to connect to your bracelet."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true

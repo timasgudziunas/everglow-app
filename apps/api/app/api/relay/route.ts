@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { getAblyRest } from '../../../lib/ably';
 import { createSupabaseServiceClient } from '../../../lib/supabase-server';
+import { sendSilentPush } from '../../../lib/apns';
 
 async function getAuthUser(request: NextRequest) {
   const token = request.headers.get('authorization')?.replace('Bearer ', '');
@@ -48,6 +49,24 @@ export async function POST(request: NextRequest) {
   const partnerId = link.user_id === user.id ? link.partner_id : link.user_id;
 
   await getAblyRest().channels.get(`beats:${partnerId}`).publish('beat', body);
+
+  // Foreground delivery is handled by the partner's Ably subscription above. When
+  // their app is backgrounded, iOS suspends that socket — so we ALSO fire a silent
+  // APNs push to wake their app and let it relay this beat to the bracelet over BLE.
+  // Scheduled with `after()` so the token lookup + push run after the response is
+  // sent and never add latency to the relay. sendSilentPush no-ops when APNs is
+  // unconfigured, so this is inert until real credentials are dropped in.
+  after(async () => {
+    const { data: deviceToken } = await service
+      .from('device_tokens')
+      .select('token')
+      .eq('user_id', partnerId)
+      .maybeSingle();
+
+    if (deviceToken?.token) {
+      await sendSilentPush(deviceToken.token, { beat: body });
+    }
+  });
 
   return NextResponse.json({ ok: true });
 }

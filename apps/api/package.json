@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@parse/node-apn": "^8.1.0",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.2",
     "ably": "^2.22.0",

@@ -1,6 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Device, State, BleError, Subscription } from 'react-native-ble-plx';
-import { bleManager, GATT } from '../lib/ble';
+import {
+  bleManager,
+  GATT,
+  setConnectedDeviceId,
+  sendLightCommandToBracelet,
+  type LightCommand,
+} from '../lib/ble';
 
 export type ScanState = 'idle' | 'scanning' | 'connecting' | 'connected' | 'error';
 
@@ -14,11 +20,9 @@ export type BeatEvent = {
   checksum: number;
 };
 
-export type LightCommand = {
-  command: 0x00 | 0x01; // 0x00 = off, 0x01 = pulse
-  durationMs: number;
-  brightness: number; // 0–255
-};
+// Re-exported from lib/ble (single source of truth) so existing imports of
+// LightCommand from this module keep working.
+export type { LightCommand };
 
 export type UseBLEReturn = {
   btState: State;
@@ -40,15 +44,6 @@ function base64ToBytes(base64: string): Uint8Array {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
-}
-
-function buildLightCommand(cmd: LightCommand): string {
-  const bytes = new Uint8Array(4);
-  const view = new DataView(bytes.buffer);
-  view.setUint8(0, cmd.command);
-  view.setUint16(1, cmd.durationMs, true);
-  view.setUint8(3, cmd.brightness);
-  return btoa(String.fromCharCode(...bytes));
 }
 
 function parseBeatEvent(base64: string): BeatEvent | null {
@@ -140,6 +135,9 @@ export function useBLE(): UseBLEReturn {
       );
 
       connectedDeviceRef.current = connected;
+      // Publish the device id to module scope so the background wake handler can
+      // reach this bracelet without going through React.
+      setConnectedDeviceId(connected.id);
       setConnectedDevice(connected);
       setScanState('connected');
     } catch (err: unknown) {
@@ -149,15 +147,10 @@ export function useBLE(): UseBLEReturn {
     }
   }, []);
 
-  const sendLightCommand = useCallback(async (cmd: LightCommand) => {
-    const device = connectedDeviceRef.current;
-    if (!device) return;
-    await device.writeCharacteristicWithoutResponseForService(
-      GATT.SERVICE_UUID,
-      GATT.LIGHT_COMMAND_CHARACTERISTIC,
-      buildLightCommand(cmd)
-    );
-  }, []);
+  const sendLightCommand = useCallback(
+    (cmd: LightCommand) => sendLightCommandToBracelet(cmd),
+    []
+  );
 
   return {
     btState,
