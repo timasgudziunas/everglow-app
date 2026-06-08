@@ -6,6 +6,7 @@ import {
   FlatList,
   ActivityIndicator,
 } from 'react-native';
+import { router } from 'expo-router';
 import { State, Device } from 'react-native-ble-plx';
 // Swap to useBLE when testing on real hardware
 import { useMockBLE as useBLE } from '../../hooks/useMockBLE';
@@ -132,6 +133,22 @@ export default function PairBraceletScreen() {
           contentContainerStyle={styles.listContent}
         />
       )}
+
+      {scanState === 'connected' && (
+        <TouchableOpacity
+          style={styles.continueButton}
+          onPress={() => router.push('/onboarding/link-partner')}
+        >
+          <Text style={styles.continueButtonText}>Continue</Text>
+        </TouchableOpacity>
+      )}
+
+      <TouchableOpacity
+        style={styles.skipButton}
+        onPress={() => router.push('/onboarding/link-partner')}
+      >
+        <Text style={styles.skipButtonText}>Skip for now</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -252,6 +269,28 @@ const styles = StyleSheet.create({
   },
   relayError: {
     color: '#FF6B6B',
+  },
+  continueButton: {
+    backgroundColor: '#F5A623',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    marginTop: 24,
+    width: '100%',
+    alignItems: 'center',
+  },
+  continueButtonText: {
+    color: '#1A1A1A',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  skipButton: {
+    marginTop: 16,
+    paddingVertical: 8,
+  },
+  skipButtonText: {
+    color: '#555555',
+    fontSize: 14,
   },
   list: {
     width: '100%',

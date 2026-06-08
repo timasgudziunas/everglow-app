@@ -83,7 +83,7 @@ The firmware engineer needs only these UUIDs and byte layouts to build their sid
 - [x] All four wearing-state variations (both, just you, just partner, neither)
 
 ### Phase 5 — Onboarding and polish
-- [ ] Full onboarding flow (pair bracelet → create account → link partner)
-- [ ] iOS background execution handling and graceful fallback glow
+- [x] Full onboarding flow (pair bracelet → create account → link partner)
+- [x] iOS background execution handling and graceful fallback glow
 - [ ] Quiet hours setting
 - [ ] Error states, reconnection logic, edge cases

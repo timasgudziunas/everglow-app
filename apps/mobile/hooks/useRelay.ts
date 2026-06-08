@@ -10,12 +10,16 @@ export type RelayState = 'idle' | 'connecting' | 'connected' | 'error';
 // Bridges BLE ↔ backend ↔ partner's phone.
 // - Forwards each outbound beat to /api/relay (fire-and-forget per beat).
 // - Subscribes to beats:{userId} on Ably and pulses the bracelet on arrival.
+// - When isBackground=true, sends a resting glow to the bracelet and pauses
+//   outbound forwarding (iOS suspends the network socket anyway).
 export function useRelay({
   latestBeat,
   sendLightCommand,
+  isBackground = false,
 }: {
   latestBeat: BeatEvent | null;
   sendLightCommand: (cmd: LightCommand) => Promise<void>;
+  isBackground?: boolean;
 }): { relayState: RelayState; lastRelayError: string | null; latestPartnerBeat: BeatEvent | null } {
   const { session } = useSession();
   const [relayState, setRelayState] = useState<RelayState>('idle');
@@ -28,6 +32,15 @@ export function useRelay({
 
   // Sequence tracking to avoid double-posting the same beat
   const lastSequenceRef = useRef<number>(-1);
+
+  // When app moves to background, send a dim long-duration pulse to the bracelet.
+  // BLE Central stays active under the bluetooth-central background mode, so the
+  // write goes through even though the network relay is suspended by iOS.
+  useEffect(() => {
+    if (isBackground) {
+      sendLightCommandRef.current({ command: 0x01, durationMs: 30_000, brightness: 50 });
+    }
+  }, [isBackground]);
 
   // Open an Ably Realtime connection for the duration the user has a session.
   // Re-connects automatically if the access token is refreshed.
@@ -80,9 +93,9 @@ export function useRelay({
     };
   }, [session?.access_token]);
 
-  // Forward each new outbound beat to the backend relay
+  // Forward each new outbound beat to the backend relay (skipped when backgrounded)
   useEffect(() => {
-    if (!latestBeat || !session) return;
+    if (!latestBeat || !session || isBackground) return;
     if (latestBeat.sequence === lastSequenceRef.current) return;
     lastSequenceRef.current = latestBeat.sequence;
 

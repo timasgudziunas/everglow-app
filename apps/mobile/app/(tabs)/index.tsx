@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { HeartbeatRing } from '../../components/HeartbeatRing';
 import { useMockBLE } from '../../hooks/useMockBLE';
 import { useRelay } from '../../hooks/useRelay';
+import { useAppState } from '../../hooks/useAppState';
 import type { WearingState } from '../../hooks/useBLE';
 
 const AMBER = '#F59E0B';
@@ -21,7 +22,8 @@ function statusLabel(state: WearingState, deviceName?: string | null): string {
 // Phase 5: replace useMockBLE with global BLE context from onboarding flow.
 export default function HomeScreen() {
   const { devices, scanState, connectedDevice, latestBeat, startScan, connectToDevice, sendLightCommand } = useMockBLE();
-  const { latestPartnerBeat } = useRelay({ latestBeat, sendLightCommand });
+  const { isBackground } = useAppState();
+  const { latestPartnerBeat } = useRelay({ latestBeat, sendLightCommand, isBackground });
 
   const intervalBuffer = useRef<number[]>([]);
   const [bpm, setBpm] = useState<number | null>(null);

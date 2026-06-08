@@ -7,7 +7,9 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
+import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { useOnboarding } from '../../lib/onboarding';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
 
@@ -32,6 +34,7 @@ async function partnerRequest(action: string, extra?: Record<string, string>) {
 type Mode = 'choose' | 'generate' | 'enter';
 
 export default function LinkPartnerScreen() {
+  const { markOnboardingComplete } = useOnboarding();
   const [mode, setMode] = useState<Mode>('choose');
 
   // Generate state
@@ -106,6 +109,15 @@ export default function LinkPartnerScreen() {
         <TouchableOpacity style={styles.buttonOutline} onPress={() => setMode('enter')}>
           <Text style={styles.buttonOutlineText}>Enter partner's code</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.skip}
+          onPress={async () => {
+            await markOnboardingComplete();
+            router.replace('/(tabs)');
+          }}
+        >
+          <Text style={styles.skipText}>Skip for now</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -152,6 +164,15 @@ export default function LinkPartnerScreen() {
       {linked ? (
         <View style={styles.successBox}>
           <Text style={styles.successText}>Partners linked!</Text>
+          <TouchableOpacity
+            style={styles.goButton}
+            onPress={async () => {
+              await markOnboardingComplete();
+              router.replace('/(tabs)');
+            }}
+          >
+            <Text style={styles.goButtonText}>Go to app</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <>
@@ -258,6 +279,18 @@ const styles = StyleSheet.create({
     marginTop: 32,
     alignItems: 'center',
     width: '100%',
+    gap: 16,
   },
   successText: { color: '#4CAF50', fontSize: 20, fontWeight: '600' },
+  goButton: {
+    backgroundColor: '#F5A623',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    width: '100%',
+  },
+  goButtonText: { color: '#1A1A1A', fontSize: 16, fontWeight: '700' },
+  skip: { marginTop: 24, paddingVertical: 8 },
+  skipText: { color: '#555555', fontSize: 14 },
 });
