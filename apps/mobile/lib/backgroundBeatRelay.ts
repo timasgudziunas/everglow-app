@@ -1,6 +1,7 @@
 import * as TaskManager from 'expo-task-manager';
 import * as Notifications from 'expo-notifications';
 import { sendLightCommandToBracelet } from './ble';
+import { isWithinQuietHours, loadQuietHours, QUIET_HOURS_BRIGHTNESS } from './quietHours';
 
 export const BACKGROUND_BEAT_RELAY = 'BACKGROUND_BEAT_RELAY';
 
@@ -60,11 +61,15 @@ TaskManager.defineTask(BACKGROUND_BEAT_RELAY, async ({ data, error }) => {
   const beat = extractBeat(data);
   if (!beat) return;
 
+  // Quiet hours: the bracelet still breathes with the partner's beat, just faintly.
+  // Read from local storage — no network/auth, so it stays off the relay's critical path.
+  const brightness = isWithinQuietHours(await loadQuietHours()) ? QUIET_HOURS_BRIGHTNESS : 200;
+
   try {
     await sendLightCommandToBracelet({
       command: 0x01,
       durationMs: beat.intervalMs,
-      brightness: 200,
+      brightness,
     });
   } catch {
     // A single dropped beat is acceptable — never throw out of a background task.

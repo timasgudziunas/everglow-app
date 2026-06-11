@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { State } from 'react-native-ble-plx';
 import { HeartbeatRing } from '../../components/HeartbeatRing';
 import { useMockBLE } from '../../hooks/useMockBLE';
 import { useRelay } from '../../hooks/useRelay';
@@ -21,9 +22,9 @@ function statusLabel(state: WearingState, deviceName?: string | null): string {
 
 // Phase 5: replace useMockBLE with global BLE context from onboarding flow.
 export default function HomeScreen() {
-  const { devices, scanState, connectedDevice, latestBeat, startScan, connectToDevice, sendLightCommand } = useMockBLE();
+  const { btState, devices, scanState, connectedDevice, latestBeat, errorMessage, startScan, connectToDevice, sendLightCommand } = useMockBLE();
   const { isBackground } = useAppState();
-  const { latestPartnerBeat } = useRelay({ latestBeat, sendLightCommand, isBackground });
+  const { latestPartnerBeat, relayState } = useRelay({ latestBeat, sendLightCommand, isBackground });
 
   const intervalBuffer = useRef<number[]>([]);
   const [bpm, setBpm] = useState<number | null>(null);
@@ -76,12 +77,53 @@ export default function HomeScreen() {
   const beatForRing = wearingState === 'both' || wearingState === 'partner_only' ? latestPartnerBeat : null;
   const bpmForRing  = wearingState === 'both' || wearingState === 'partner_only' ? bpm : null;
 
+  const notice = connectionNotice(btState, scanState, errorMessage);
+
   return (
     <View style={styles.container}>
       <HeartbeatRing beat={beatForRing} bpm={bpmForRing} wearingState={wearingState} />
       <Text style={styles.status}>{statusLabel(wearingState, connectedDevice?.name)}</Text>
+
+      {notice && (
+        <View style={styles.notice}>
+          {notice.spinner && <ActivityIndicator color={AMBER} style={styles.noticeSpinner} />}
+          <Text style={styles.noticeText}>{notice.text}</Text>
+          {notice.showRetry && (
+            <TouchableOpacity style={styles.retryButton} onPress={startScan}>
+              <Text style={styles.retryText}>Try again</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {/* Relay trouble is non-fatal — the bracelet keeps the last glow; just hint at it */}
+      {scanState === 'connected' && relayState === 'error' && (
+        <Text style={styles.relayNotice}>Relay offline — reconnecting…</Text>
+      )}
     </View>
   );
+}
+
+type Notice = { text: string; showRetry: boolean; spinner: boolean };
+
+function connectionNotice(
+  btState: State,
+  scanState: string,
+  errorMessage: string | null
+): Notice | null {
+  if (btState === State.PoweredOff) {
+    return { text: 'Bluetooth is off — turn it on to feel your partner.', showRetry: false, spinner: false };
+  }
+  if (btState === State.Unauthorized) {
+    return { text: 'Bluetooth permission denied — enable it in Settings → Everglow.', showRetry: false, spinner: false };
+  }
+  if (scanState === 'reconnecting') {
+    return { text: 'Reconnecting to your bracelet…', showRetry: false, spinner: true };
+  }
+  if (scanState === 'error') {
+    return { text: errorMessage ?? 'Something went wrong', showRetry: true, spinner: false };
+  }
+  return null;
 }
 
 const styles = StyleSheet.create({
@@ -93,5 +135,37 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     letterSpacing: 1,
     opacity: 0.55,
+  },
+  notice: {
+    marginTop: 24,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+  },
+  noticeSpinner: {
+    marginBottom: 10,
+  },
+  noticeText: {
+    color: '#AAAAAA',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  retryButton: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: AMBER,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 24,
+  },
+  retryText: {
+    color: AMBER,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  relayNotice: {
+    marginTop: 16,
+    color: '#777777',
+    fontSize: 12,
   },
 });

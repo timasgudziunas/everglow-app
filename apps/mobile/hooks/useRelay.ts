@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as Ably from 'ably';
 import { useSession } from '../lib/auth';
+import { useQuietHours, isWithinQuietHours, QUIET_HOURS_BRIGHTNESS } from '../lib/quietHours';
 import type { BeatEvent, LightCommand } from './useBLE';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL!;
@@ -30,6 +31,12 @@ export function useRelay({
   const sendLightCommandRef = useRef(sendLightCommand);
   useEffect(() => { sendLightCommandRef.current = sendLightCommand; }, [sendLightCommand]);
 
+  // Latest quiet-hours window, mirrored into a ref so the long-lived Ably and
+  // background closures always read the current value without re-subscribing.
+  const { quietHours } = useQuietHours();
+  const quietHoursRef = useRef(quietHours);
+  useEffect(() => { quietHoursRef.current = quietHours; }, [quietHours]);
+
   // Sequence tracking to avoid double-posting the same beat
   const lastSequenceRef = useRef<number>(-1);
 
@@ -38,7 +45,8 @@ export function useRelay({
   // write goes through even though the network relay is suspended by iOS.
   useEffect(() => {
     if (isBackground) {
-      sendLightCommandRef.current({ command: 0x01, durationMs: 30_000, brightness: 50 });
+      const brightness = isWithinQuietHours(quietHoursRef.current) ? QUIET_HOURS_BRIGHTNESS : 50;
+      sendLightCommandRef.current({ command: 0x01, durationMs: 30_000, brightness });
     }
   }, [isBackground]);
 
@@ -79,10 +87,12 @@ export function useRelay({
     channel.subscribe('beat', (message: Ably.Message) => {
       const beat = message.data as BeatEvent;
       setLatestPartnerBeat(beat);
+      // During quiet hours the bracelet still breathes with the partner's beat, just faintly.
+      const brightness = isWithinQuietHours(quietHoursRef.current) ? QUIET_HOURS_BRIGHTNESS : 200;
       sendLightCommandRef.current({
         command: 0x01,
         durationMs: beat.intervalMs,
-        brightness: 200,
+        brightness,
       });
     });
 

@@ -12,6 +12,21 @@ function nextIntervalMs(): number {
   return 820 + Math.floor(Math.random() * 120);
 }
 
+// ┌───────────────────────────────────────────────────────────────────────────┐
+// │ DEV-ONLY SCAFFOLDING — simulated reconnection.                             │
+// │ Drives scanState through connected → reconnecting → connected on a loop so │
+// │ the reconnection UI can be seen without real hardware.                     │
+// │                                                                            │
+// │ TO REMOVE (two steps, nothing else references these):                      │
+// │   1. Delete this constants block.                                          │
+// │   2. Delete the one useEffect tagged "DEV-ONLY SCAFFOLDING" in useMockBLE. │
+// │ Or just set SIMULATE_DISCONNECTS = false to disable it in place.           │
+// │ This whole thing is moot once the app swaps useMockBLE → useBLE anyway.    │
+// └───────────────────────────────────────────────────────────────────────────┘
+const SIMULATE_DISCONNECTS = true;
+const SIM_CONNECTED_MS = 12_000; // stay connected this long before a simulated drop
+const SIM_RECONNECTING_MS = 4_000; // time spent "reconnecting" before recovering
+
 export function useMockBLE(): UseBLEReturn {
   const [btState, setBtState] = useState<State>(State.Unknown);
   const [scanState, setScanState] = useState<ScanState>('idle');
@@ -32,6 +47,28 @@ export function useMockBLE(): UseBLEReturn {
       if (beatTimerRef.current) clearTimeout(beatTimerRef.current);
     };
   }, []);
+
+  // DEV-ONLY SCAFFOLDING — simulated reconnection (see the constants block above).
+  // Self-contained: depends only on connectedDevice, touches no other code path.
+  // Delete this whole useEffect to remove the feature.
+  useEffect(() => {
+    if (!SIMULATE_DISCONNECTS || !connectedDevice) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const loop = (next: 'connected' | 'reconnecting') => {
+      if (cancelled) return;
+      setScanState(next);
+      timer = setTimeout(
+        () => loop(next === 'connected' ? 'reconnecting' : 'connected'),
+        next === 'connected' ? SIM_CONNECTED_MS : SIM_RECONNECTING_MS
+      );
+    };
+    loop('connected');
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [connectedDevice]);
 
   const startScan = useCallback(() => {
     setDevices([]);

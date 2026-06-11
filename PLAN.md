@@ -14,7 +14,7 @@ A paired wearable bracelet that reads one partner's heartbeat via a PPG sensor a
 4. **Partner linking** — One partner generates a short invite code in the app, the other enters it. Backend links the two account IDs permanently. No beat data flows until this link exists.
 5. **Real-time beat relay** — Phone receives beat events from bracelet over BLE and forwards them to the backend over a WebSocket connection. Backend routes events to the partner's phone in under 1 second end-to-end. Partner's phone sends the beat event to the partner's bracelet over BLE. Bracelet renders the amber breathing pulse locally. Both directions run simultaneously. Beat timestamps pass through encrypted and are never stored or logged.
 6. **Home screen** — Animated heartbeat ring driven by live incoming beat events, BPM display, connection status, four wearing-state variations (both, just you, just partner, neither).
-7. **iOS background execution** — Beat relay must keep running when the app is backgrounded or the phone locks. Uses presence sessions (active foreground) with graceful fallback to a resting glow on the bracelet when backgrounded. Not 24/7 streaming — "less than a second" latency is accurate during an active session.
+7. **iOS background execution** — The beat relay must stay genuinely alive when the app is backgrounded or the phone locks — relaying real beats, not just idling. iOS suspends the Ably WebSocket on background, so a silent push (APNs `content-available`) wakes the app, which relays the beat to the bracelet over BLE (the `bluetooth-central` background mode keeps the BLE link open). The resting glow on the bracelet is only a degraded fallback for when silent push is unavailable (e.g. credentials not yet configured) or a wake is missed — it is not the intended steady state. Sub-second latency holds during an active session, foreground or background.
 8. **Onboarding flow** — Open app → create account → pair bracelet → invite partner or enter partner's code. Must complete in under 3 minutes with no technical knowledge required.
 9. **Basic settings** — Quiet hours (bracelet dims after set time), relationship start date, next visit date.
 
@@ -54,6 +54,17 @@ Light command — 4 bytes, little-endian: `uint8 command (0x00 off, 0x01 pulse) 
 
 The firmware engineer needs only these UUIDs and byte layouts to build their side.
 
+### Silent push (APNs) — pending credentials, 2026-06-08
+Silent-push background relay (Core Feature #7) is fully implemented but **inert until real APNs credentials exist** — the `APNS_*` env vars are `PLACEHOLDER`, so the backend skips the push and the app runs on the foreground-only Ably path exactly as before. Setup steps live in `APNS_SETUP.md`.
+
+Blockers before this path goes live:
+- **Apple Developer account + APNs auth key (`.p8`)** → real `APNS_*` values. Until then the relay is foreground-only.
+- **On-device verification** — silent push and background BLE writes cannot be exercised on a simulator. Hardware expected mid-to-late June 2026; verify the full backgrounded loop (push wakes app → BLE write reaches bracelet) once it arrives.
+- **`useMockBLE` → `useBLE` swap** (Phase 2's open hardware item). The background wake handler pulses the device id registered by `useBLE` via `setConnectedDeviceId`; the mock never registers one, so the background path stays dark until the swap.
+- **Token type swap** — `usePushToken` currently registers an Expo push token; switch it to `getDevicePushTokenAsync()` for the raw APNs token when going live (marked in-code, documented in `APNS_SETUP.md`).
+
+When enabling, also revisit `useRelay`'s background branch — it currently pauses outbound forwarding and sends a resting glow on background, which must give way to keeping the real relay alive.
+
 ---
 
 ## Build Plan
@@ -84,6 +95,7 @@ The firmware engineer needs only these UUIDs and byte layouts to build their sid
 
 ### Phase 5 — Onboarding and polish
 - [x] Full onboarding flow (pair bracelet → create account → link partner)
-- [x] iOS background execution handling and graceful fallback glow
-- [ ] Quiet hours setting
-- [ ] Error states, reconnection logic, edge cases
+- [x] Resting-glow fallback when backgrounded (degraded mode only — not the primary path)
+- [~] Silent-push background relay (APNs) keeps the real relay alive while backgrounded — code complete; pending APNs credentials + on-device verification (see "Silent push (APNs)" above and `APNS_SETUP.md`)
+- [x] Quiet hours setting — local-storage window (`lib/quietHours.tsx`), settings UI, gates **both** the foreground relay (`useRelay`) and the background wake handler (`lib/backgroundBeatRelay.ts`) so the bracelet breathes faintly (dim glow) instead of pulsing brightly, even when a silent push wakes the app
+- [x] Error states, reconnection logic, edge cases — BLE auto-reconnect with exponential backoff on unexpected disconnect (`useBLE`), Bluetooth-off teardown, scan timeout ("no bracelet found"), and home-screen surfacing of reconnecting / BT-off / error+retry / relay-offline states

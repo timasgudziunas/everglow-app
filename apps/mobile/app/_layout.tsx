@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { SessionProvider } from '../lib/auth';
 import { OnboardingProvider } from '../lib/onboarding';
+import { QuietHoursProvider } from '../lib/quietHours';
 import { usePushToken } from '../hooks/usePushToken';
 // Importing this module runs TaskManager.defineTask at startup, registering the
 // background beat-relay handler with the native task system. Must be a top-level
@@ -23,12 +24,14 @@ export default function RootLayout() {
   return (
     <SessionProvider>
       <OnboardingProvider>
-        <PushRegistrar />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="onboarding" />
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(tabs)" />
-        </Stack>
+        <QuietHoursProvider>
+          <PushRegistrar />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="onboarding" />
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+          </Stack>
+        </QuietHoursProvider>
       </OnboardingProvider>
     </SessionProvider>
   );

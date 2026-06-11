@@ -77,6 +77,9 @@ export default function PairBraceletScreen() {
         </View>
       );
     }
+    if (scanState === 'reconnecting') {
+      return <Text style={styles.hint}>Reconnecting to your bracelet…</Text>;
+    }
     if (scanState === 'error') {
       return <Text style={styles.error}>{errorMessage ?? 'Something went wrong'}</Text>;
     }
@@ -101,7 +104,7 @@ export default function PairBraceletScreen() {
 
       {renderStatusMessage()}
 
-      {scanState === 'connecting' && (
+      {(scanState === 'connecting' || scanState === 'reconnecting') && (
         <ActivityIndicator color="#F5A623" size="large" style={styles.spinner} />
       )}
 
