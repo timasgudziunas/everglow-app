@@ -114,7 +114,11 @@ expects. No backend changes are needed.
 4. Apply the `device_tokens` migration to Supabase
    (`supabase/migrations/20260608000001_device_tokens.sql`).
 5. Swap to `getDevicePushTokenAsync()` in `usePushToken.ts` (step 5).
-6. Rebuild the iOS app (a native rebuild is required for the new
-   `remote-notification` background mode and the push entitlement).
+6. Rebuild the iOS app. `UIBackgroundModes: remote-notification` is **already**
+   set in `apps/mobile/app.json` (alongside `bluetooth-central`) — no app.json
+   change is needed for that. What's actually missing is the push
+   capability/entitlement in the provisioning profile, which isn't an app.json
+   field: add it in Xcode (Signing & Capabilities → Push Notifications) or via
+   EAS credentials, then do a native rebuild to pick it up.
 
 No other code changes are required.

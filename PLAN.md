@@ -2,17 +2,17 @@
 
 ## Product Overview
 
-A paired wearable bracelet that reads one partner's heartbeat via a PPG sensor and transmits it to the other partner's bracelet in real time, rendering it as a breathing amber glow. The app handles bracelet pairing, partner linking, and the real-time beat relay. Heartbeat data is end-to-end encrypted, passes through servers as beat timestamps only, and is never stored or logged.
+A paired wearable bracelet that reads one partner's heartbeat via a PPG sensor and transmits it to the other partner's bracelet in real time, rendering it as a breathing amber glow. The app handles bracelet pairing, partner linking, and the real-time beat relay. Heartbeat data is encrypted in transit (TLS); beat events are relayed as beat timestamps only, and are never stored or logged.
 
 ---
 
 ## Core Features (priority order)
 
 1. **BLE bracelet pairing** — Scan for nearby bracelet over BLE, pair it to the phone, verify the GATT profile matches. Each partner does this independently on their own device. Firmware and app must agree on the shared GATT base UUID before either side builds.
-2. **Beat event reception** — Bracelet detects heartbeats on-device using the PPG sensor and emits a single ~8-byte encrypted beat event per heartbeat over BLE. The phone receives these events — it does not stream raw PPG data. This is the atomic unit the entire system is built on.
+2. **Beat event reception** — Bracelet detects heartbeats on-device using the PPG sensor and emits a single ~8-byte beat event per heartbeat over BLE (see the locked byte layout below — plain fields plus a checksum, no application-level encryption). The phone receives these events — it does not stream raw PPG data. This is the atomic unit the entire system is built on.
 3. **User accounts** — Email/phone signup and login. Each partner creates their own account independently.
 4. **Partner linking** — One partner generates a short invite code in the app, the other enters it. Backend links the two account IDs permanently. No beat data flows until this link exists.
-5. **Real-time beat relay** — Phone receives beat events from bracelet over BLE and forwards them to the backend over a WebSocket connection. Backend routes events to the partner's phone in under 1 second end-to-end. Partner's phone sends the beat event to the partner's bracelet over BLE. Bracelet renders the amber breathing pulse locally. Both directions run simultaneously. Beat timestamps pass through encrypted and are never stored or logged.
+5. **Real-time beat relay** — Phone receives beat events from bracelet over BLE and forwards them to the backend via an HTTP POST per beat (`POST /api/relay`; see `apps/mobile/hooks/useRelay.ts`). Backend routes events to the partner's phone in under 1 second end-to-end over a WebSocket (the partner's phone holds an Ably Realtime subscription — the inbound leg only). Partner's phone sends the beat event to the partner's bracelet over BLE. Bracelet renders the amber breathing pulse locally. Both directions run simultaneously. Beat timestamps are encrypted in transit (TLS); beat events are relayed, never stored.
 6. **Home screen** — Animated heartbeat ring driven by live incoming beat events, BPM display, connection status, four wearing-state variations (both, just you, just partner, neither).
 7. **iOS background execution** — The beat relay must stay genuinely alive when the app is backgrounded or the phone locks — relaying real beats, not just idling. iOS suspends the Ably WebSocket on background, so a silent push (APNs `content-available`) wakes the app, which relays the beat to the bracelet over BLE (the `bluetooth-central` background mode keeps the BLE link open). The resting glow on the bracelet is only a degraded fallback for when silent push is unavailable (e.g. credentials not yet configured) or a wake is missed — it is not the intended steady state. Sub-second latency holds during an active session, foreground or background.
 8. **Onboarding flow** — Open app → create account → pair bracelet → invite partner or enter partner's code. Must complete in under 3 minutes with no technical knowledge required.
@@ -59,7 +59,7 @@ Silent-push background relay (Core Feature #7) is fully implemented but **inert 
 
 Blockers before this path goes live:
 - **Apple Developer account + APNs auth key (`.p8`)** → real `APNS_*` values. Until then the relay is foreground-only.
-- **On-device verification** — silent push and background BLE writes cannot be exercised on a simulator. Hardware expected mid-to-late June 2026; verify the full backgrounded loop (push wakes app → BLE write reaches bracelet) once it arrives.
+- **On-device verification** — silent push and background BLE writes cannot be exercised on a simulator. Hardware ETA slipped: originally expected mid-to-late June 2026, that date has passed with no delivery recorded in this repo as of 2026-07-18. New ETA unknown; verify the full backgrounded loop (push wakes app → BLE write reaches bracelet) once it arrives.
 - **`useMockBLE` → `useBLE` swap** (Phase 2's open hardware item). The background wake handler pulses the device id registered by `useBLE` via `setConnectedDeviceId`; the mock never registers one, so the background path stays dark until the swap.
 - **Token type swap** — `usePushToken` currently registers an Expo push token; switch it to `getDevicePushTokenAsync()` for the raw APNs token when going live (marked in-code, documented in `APNS_SETUP.md`).
 
@@ -68,6 +68,8 @@ When enabling, also revisit `useRelay`'s background branch — it currently paus
 ---
 
 ## Build Plan
+
+Legend: `[x]` done · `[ ]` open · `[~]` partially done / blocked
 
 ### Phase 1 — Skeleton
 - [x] Scaffold React Native + Expo project
@@ -80,7 +82,7 @@ When enabling, also revisit `useRelay`'s background branch — it currently paus
 - [x] BLE scan, pair, and connect to bracelet
 - [x] Receive beat events from bracelet on the phone
 - [x] Send light pulse commands back to bracelet
-- [ ] Verify the full bracelet ↔ phone loop works on real hardware (`hooks/useMockBLE.ts` stands in until then — swap import in `pair-bracelet.tsx`)
+- [ ] Verify the full bracelet ↔ phone loop works on real hardware (`hooks/useMockBLE.ts` stands in until then — there are two swap sites: the marked import in `pair-bracelet.tsx`, and `app/(tabs)/index.tsx`'s own direct `useMockBLE` call, which additionally needs the global BLE context refactor below before it can swap)
 
 ### Phase 3 — Partner sync and relay
 - [x] Invite code generation and partner linking
@@ -99,3 +101,4 @@ When enabling, also revisit `useRelay`'s background branch — it currently paus
 - [~] Silent-push background relay (APNs) keeps the real relay alive while backgrounded — code complete; pending APNs credentials + on-device verification (see "Silent push (APNs)" above and `APNS_SETUP.md`)
 - [x] Quiet hours setting — local-storage window (`lib/quietHours.tsx`), settings UI, gates **both** the foreground relay (`useRelay`) and the background wake handler (`lib/backgroundBeatRelay.ts`) so the bracelet breathes faintly (dim glow) instead of pulsing brightly, even when a silent push wakes the app
 - [x] Error states, reconnection logic, edge cases — BLE auto-reconnect with exponential backoff on unexpected disconnect (`useBLE`), Bluetooth-off teardown, scan timeout ("no bracelet found"), and home-screen surfacing of reconnecting / BT-off / error+retry / relay-offline states
+- [ ] Global BLE context so the home screen can share a real BLE connection instead of calling `useMockBLE` directly (`app/(tabs)/index.tsx` still has its own scan/connect-on-mount and the unactioned `// Phase 5: replace useMockBLE with global BLE context from onboarding flow` TODO) — hardware-gated in practice, but the context itself is a code task and could be done before hardware arrives

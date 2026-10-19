@@ -1,6 +1,8 @@
 # Everglow — Codebase Guide
 
-Paired wearable bracelet app. One partner's heartbeat is read by a PPG sensor in the bracelet and sent as a breathing amber glow to the other partner's bracelet in real time. Beat timestamps pass through end-to-end encrypted and are never stored.
+Paired wearable bracelet app. One partner's heartbeat is read by a PPG sensor in the bracelet and sent as a breathing amber glow to the other partner's bracelet in real time. Beat timestamps are encrypted in transit (TLS); beat events are relayed, never stored.
+
+True end-to-end encryption (payload unreadable by the backend itself) is **not implemented** — `apps/api/app/api/relay/route.ts` publishes the beat event as plain JSON to Ably and reads the cleartext fields. This would be future work if wanted.
 
 ---
 
@@ -12,11 +14,12 @@ Paired wearable bracelet app. One partner's heartbeat is read by a PPG sensor in
 | Phase 2 — Hardware | ✅ Done* | BLE scan, GATT pairing, beat reception, light commands, auto-reconnect |
 | Phase 3 — Partner sync | ✅ Done | Invite codes, Ably relay, bidirectional beat flow |
 | Phase 4 — Home screen | ✅ Done | Animated heartbeat ring, BPM display, wearing states |
-| Phase 5 — Polish | ✅ Done* | Onboarding, background relay (silent push), quiet hours, error/reconnect states |
+| Phase 5 — Onboarding and polish | ✅ Done* | Onboarding, background relay (silent push), quiet hours, error/reconnect states |
 
-**\*Two items remain — both hardware/credential-gated, not code:**
-- **Phase 2 — real-hardware verification.** The full bracelet ↔ phone loop hasn't been run on a physical device. The app still uses `apps/mobile/hooks/useMockBLE.ts`; swap the import to `useBLE` when hardware arrives (the `pair-bracelet.tsx` import is the marked swap point).
+**\*Three items remain — two hardware/credential-gated, one a code refactor:**
+- **Phase 2 — real-hardware verification.** The full bracelet ↔ phone loop hasn't been run on a physical device. The app still uses `apps/mobile/hooks/useMockBLE.ts`. There are **two swap sites**, not one: `apps/mobile/app/onboarding/pair-bracelet.tsx` (marked, imports `useMockBLE as useBLE`) and `apps/mobile/app/(tabs)/index.tsx` (also calls `useMockBLE` directly, with its own scan/connect-on-mount, carrying an unactioned `// Phase 5: replace useMockBLE with global BLE context from onboarding flow` TODO). No global BLE context exists yet — the home screen needs that refactor before it can run on real hardware, independent of the pair-bracelet swap.
 - **Phase 5 — silent-push background relay** is code-complete but inert until real APNs credentials replace the `APNS_*` placeholders + it's verified on-device. See `APNS_SETUP.md`.
+- **Phase 5 — global BLE context refactor.** The home screen's TODO above was never done; it's the reason the home screen swap isn't a one-line change like `pair-bracelet.tsx`'s.
 
 The GATT profile is **locked** (2026-06-06) — real UUIDs + byte layouts live in `apps/mobile/lib/ble.ts` and `PLAN.md`.
 
@@ -54,12 +57,12 @@ everglow-app/
 
 | Route (Expo Router) | File | Status |
 |---------------------|------|--------|
-| `/` | `app/(tabs)/index.tsx` | Home — heartbeat ring, BPM, connection/error states — done |
+| `/` | `app/(tabs)/index.tsx` | Home — heartbeat ring, BPM, connection/error states — done (also calls `useMockBLE` directly on mount; second swap site, see Build status) |
 | `/settings` | `app/(tabs)/settings.tsx` | Sign-out + quiet hours — done |
 | `/login` | `app/(auth)/login.tsx` | Email/password sign-in — done |
 | `/signup` | `app/(auth)/signup.tsx` | Account creation — done |
 | `/onboarding` | `app/onboarding/index.tsx` | Welcome — done |
-| `/onboarding/pair-bracelet` | `app/onboarding/pair-bracelet.tsx` | BLE pairing — done (uses `useMockBLE` until hardware) |
+| `/onboarding/pair-bracelet` | `app/onboarding/pair-bracelet.tsx` | BLE pairing — done (uses `useMockBLE` until hardware; one of two swap sites, see Build status) |
 | `/onboarding/link-partner` | `app/onboarding/link-partner.tsx` | Invite code entry — done |
 
 **Key lib files:**
@@ -87,7 +90,7 @@ everglow-app/
 - **After that, for JS changes:** `npx expo start`, then press `a` (launches the installed dev build via Metro — fast reload).
 - Requires Android Studio + SDK and an AVD, plus two env vars: `ANDROID_HOME` (→ the SDK) and `JAVA_HOME` (→ a JDK; Android Studio's bundled `...\Android Studio\jbr` works). Adding `%ANDROID_HOME%\platform-tools` to PATH (for `adb`) is optional but handy.
 
-**Env:** `apps/mobile/.env` — `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+**Env:** `apps/mobile/.env` — `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_API_URL` (required by `usePushToken.ts` and `useRelay.ts`, non-null asserted)
 
 ---
 
@@ -116,7 +119,7 @@ Pure API — no frontend. One health-check page; relay, partner-linking, Ably-au
 
 ## packages/shared
 
-TypeScript types shared by both apps. Not yet added as a dependency to either app — import as `@everglow/shared` when first needed (Phase 3).
+TypeScript types shared by both apps. **Currently unused** — not added as a dependency to either app. Phases 3–5 are complete and it still hasn't been imported; the `BeatEvent` shape is duplicated by hand in four places instead: `apps/mobile/hooks/useBLE.ts` (`BeatEvent`, explicitly commented "Mirrors packages/shared BeatEvent"), `apps/mobile/hooks/useMockBLE.ts` (same shape), `apps/mobile/lib/backgroundBeatRelay.ts` (`BeatPayload`), and `apps/api/app/api/relay/route.ts`'s `isValidBeatEvent`. Consolidating onto `@everglow/shared` is known deferred debt, not yet scheduled.
 
 | Type | Description |
 |------|-------------|
@@ -143,9 +146,24 @@ RLS enabled on all tables. Beat events are **never stored** — they flow throug
 
 ---
 
+## Resuming when hardware arrives
+
+Terse checklist for the session that picks this back up once a bracelet shows up.
+
+- **Mock BLE swap sites (two, not one) + missing BLE context.** `apps/mobile/app/onboarding/pair-bracelet.tsx` has the marked swap (`useMockBLE as useBLE`). `apps/mobile/app/(tabs)/index.tsx` also calls `useMockBLE` directly with its own scan/connect-on-mount and carries an unactioned `// Phase 5: replace useMockBLE with global BLE context from onboarding flow` TODO. No BLE context exists yet — build it before the home screen can run on real hardware; the pair-bracelet screen alone is not enough.
+- **iOS reality check.** All hardware-gated features (BLE, silent push) are iOS-only in practice — `app.json` does have `android` and `web` blocks, but the background-mode config that makes BLE and silent push actually work (`ios.infoPlist.UIBackgroundModes: [remote-notification, bluetooth-central]`, Bluetooth usage description) exists only under `ios`, with no Android equivalent. Development so far has been on the Android emulator via `useMockBLE`, which never exercises this. Building the real iOS app needs either a Mac (Xcode) or an EAS cloud build — no `eas.json` exists in this repo yet, so that has to be set up first.
+- **`APNS_SETUP.md` step 6 correction.** `UIBackgroundModes: ["remote-notification", "bluetooth-central"]` is **already** in `app.json` — that part of step 6 is done, not pending. The actually-missing piece is the push capability/entitlement in the provisioning profile, which is set via Xcode (Signing & Capabilities → Push Notifications) or EAS credentials, not by an app.json edit.
+- **Two-party testing.** Needs two Supabase accounts and a manual invite-code exchange (no seed script exists): sign up account A, complete onboarding to generate an invite code on `/onboarding/link-partner`, then sign up account B on a second device/simulator and redeem that code on the same screen.
+- **Deployment.** The API is deployed on Vercel. `apps/api/vercel.json` sets `"installCommand": "npm install --legacy-peer-deps"` (a peer-dependency conflict workaround) — don't remove it without re-checking the conflict. Env vars must be set in the Vercel project dashboard to match `apps/api/.env`.
+- **No test suite, no CI.** All verification to date has been manual (real devices/emulators, real emails, watching logs). Don't assume a green check anywhere means tested.
+
+---
+
 ## Root workspace scripts
 
 ```bash
 npm run mobile   # expo start in apps/mobile
 npm run api      # next dev in apps/api
 ```
+
+`npm run mobile` only works once a native dev build already exists on the device/emulator (see the **Run** section under `apps/mobile` above — first run needs `npx expo run:android` / `run:ios`). It will not work standalone on a fresh checkout.
