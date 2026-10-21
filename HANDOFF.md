@@ -1,6 +1,6 @@
 # Everglow — Handoff
 
-**Status as of 2026-10-19: ARCHIVED.** Hardware-gated since June 2026; bracelet hardware ETA is unknown. Project moved to `projects/archives/everglow-app`. No active development.
+**Status as of 2026-10-19: ARCHIVED.** Hardware-gated since June 2026; bracelet hardware ETA is unknown. Project moved to `projects/archives/everglow-app`. No active development. **Closed out 2026-10-21:** archive commit pushed, GitHub repo archived (read-only), Vercel project paused.
 
 ---
 
@@ -55,7 +55,7 @@ A future session needs:
 
 **No GitHub Actions cron ever existed** for this project (no `.github/workflows/` directory).
 
-**Vercel state is UNVERIFIED.** `apps/api/vercel.json` is present and sets `"installCommand": "npm install --legacy-peer-deps"` (a peer-dependency conflict workaround, do not remove without re-checking). There is no `.vercel` directory in the repo, meaning the project was never linked from this machine. The Vercel auth token was expired at archive time so the remote state could not be confirmed. The owner should check the Vercel dashboard for a lingering deployment and decide whether to delete it.
+**Vercel: PAUSED (2026-10-21).** The Vercel project `everglow-app` (team `timas-gudziunas-projects`) exists, is git-connected to GitHub `main`, and had a live production deployment from commit `7850d4b` (2026-06-11) serving `everglow-app.vercel.app`. The owner paused it from Project Settings on 2026-10-21; the domain now returns 503 DEPLOYMENT_PAUSED. Env vars, domains and deployment history are kept. To revive: unarchive the GitHub repo, then Resume Project in Vercel settings. `apps/api/vercel.json` sets `"installCommand": "npm install --legacy-peer-deps"` (a peer-dependency conflict workaround, do not remove without re-checking). There is no `.vercel` directory locally; the project was deployed through the GitHub integration, never linked from this machine.
 
 ---
 
@@ -66,4 +66,4 @@ A future session needs:
 - **Apple Developer Program** ($99/year). Not yet purchased as of archival. Required before APNs can be configured.
 - **Expo EAS** (no `eas.json` exists, so no EAS build has been run). No charges.
 - **Resend**: not used by this project.
-- **Vercel**: on the free Hobby plan as far as can be determined. No charges expected, but verify on the dashboard since the deployment state is unverified.
+- **Vercel**: Hobby plan, project paused 2026-10-21. No charges.
