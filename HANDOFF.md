@@ -1,8 +1,8 @@
-# HANDOFF.md — Session Handoff (updated 2026-10-25 ~20:30 UTC, supersedes all 2026-10-21 and earlier versions)
+# HANDOFF.md — Session Handoff (updated 2026-10-25 ~21:05 UTC, supersedes all 2026-10-21 and earlier versions)
 
 > For a fresh Claude session with no memory of prior conversations: read this file first, then `CLAUDE.md` (rules, architecture, the "Resuming when hardware arrives" checklist), then `PLAN.md` (phase status). `APNS_SETUP.md` only when touching push.
 
-## Current state (as of 2026-10-25 ~20:30 UTC)
+## Current state (as of 2026-10-25 ~21:05 UTC)
 
 **Status: ACTIVE again, revived from `projects/archives/` on 2026-10-25.** Archived 2026-10-19, closed out 2026-10-21, revived four days later. Still code-complete and hardware-gated: no bracelet hardware, no ETA.
 
@@ -26,6 +26,7 @@ Revival, no code changes: folder moved back, GitHub unarchived, Vercel unpaused 
 
 1. **`device_tokens` table does not exist on the remote Supabase project.** The restored database has the three tables from `20260605000001_initial_schema.sql` but not `20260608000001_device_tokens.sql`; that migration was evidently never pushed in June. `apps/api/app/api/device-token/route.ts` and `apps/api/app/api/relay/route.ts` both read or write it, so the push-token flow and the relay's wake-partner branch fail against the live backend until it exists. **Owner action:** paste the contents of `supabase/migrations/20260608000001_device_tokens.sql` into the Supabase SQL editor and run it, or `npx supabase login`, `npx supabase link --project-ref xrjrpwggwcguxrbrotwm`, `npx supabase db push` (needs the database password). Verify with the health check below. Applying DDL needs dashboard or CLI credentials a Claude session does not have; do not try to work around that through PostgREST.
 2. Hardware: unchanged, bracelet has no ETA. Everything in "Open technical work" below still stands.
+3. **Owner decision 2026-10-25: the app will be viewed and tested on a real iPhone, later.** That means buying the Apple Developer Program ($99/year) and then either an EAS iOS build (no `eas.json` exists yet, create it then) or Xcode on a Mac. Do not start a local Android build to show the app: one was attempted and scrapped the same day because it needed a JDK 17 install, consumed ~16 GB (Gradle cache, build output, a 4 GB emulator snapshot) and starved the emulator until System UI stopped responding. All of it was deleted. If the owner changes their mind, the lighter fallback is an EAS Android cloud build installed as an APK on the Pixel_10 AVD or a phone, launched with `-no-snapshot-save`.
 
 ## Open technical work (unchanged from archival)
 
