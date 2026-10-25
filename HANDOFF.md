@@ -1,69 +1,77 @@
-# Everglow — Handoff
+# HANDOFF.md — Session Handoff (updated 2026-10-25 ~20:15 UTC, supersedes all 2026-10-21 and earlier versions)
 
-**Status as of 2026-10-19: ARCHIVED.** Hardware-gated since June 2026; bracelet hardware ETA is unknown. Project moved to `projects/archives/everglow-app`. No active development. **Closed out 2026-10-21:** archive commit pushed, GitHub repo archived (read-only), Vercel project paused.
+> For a fresh Claude session with no memory of prior conversations: read this file first, then `CLAUDE.md` (rules, architecture, the "Resuming when hardware arrives" checklist), then `PLAN.md` (phase status). `APNS_SETUP.md` only when touching push.
 
----
+## Current state (as of 2026-10-25 ~20:15 UTC)
 
-## What was committed in the archive commit
+**Status: ACTIVE again, revived from `projects/archives/` on 2026-10-25.** Archived 2026-10-19, closed out 2026-10-21, revived four days later. Still code-complete and hardware-gated: no bracelet hardware, no ETA.
 
-Four modified files and one new file were uncommitted as of archival. The changes were documentation corrections made in a prior session that were never committed:
+| Item | State |
+|---|---|
+| Folder | `projects/everglow-app` (moved back with `robocopy /E /MOVE /XJ`) |
+| Git | `main` at `3b5ea0e`, clean tree, remote `github.com/timasgudziunas/everglow-app` |
+| GitHub repo | Unarchived 2026-10-25 (`archived: false`), pushes work again |
+| Vercel | Project `everglow-app` (team `timas-gudziunas-projects`, id `prj_Ywi4lUV5AlQLGBkeAhkrvKwDXoVc`) resumed 2026-10-25. `paused: false`. Production = deployment of `478a479`, `https://everglow-app.vercel.app` returns 200 (was 503 DEPLOYMENT_PAUSED). Git-connected to `main`, root dir `apps/api` |
+| npm workspaces | `npm install --legacy-peer-deps` run 2026-10-25; links `node_modules/api`, `node_modules/mobile`, `node_modules/@everglow/shared` restored |
+| Supabase | **BROKEN, see Blockers.** `xrjrpwggwcguxrbrotwm.supabase.co` returns NXDOMAIN |
+| Ably | Free tier, key in `apps/api/.env`, not verified this session |
+| APNs / Apple Developer | Not purchased, placeholders in `apps/api/.env` |
+| Scheduled tasks / Actions cron | None ever existed |
 
-- **`CLAUDE.md`** — Substantial accuracy pass: corrected the E2E encryption claim (TLS only, backend reads cleartext), documented two BLE mock swap sites instead of one, named the missing global BLE context as a third open item, corrected `packages/shared` to "currently unused with four duplicate `BeatEvent` definitions", added a full "Resuming when hardware arrives" checklist, and added `EXPO_PUBLIC_API_URL` to the mobile env list.
-- **`PLAN.md`** — Matching corrections: encryption wording, relay mechanism (HTTP POST per beat, not WebSocket outbound), hardware ETA note ("slipped, new ETA unknown"), and the global BLE context refactor added as an open Phase 5 checkbox.
-- **`APNS_SETUP.md`** — Corrected step 6: `UIBackgroundModes: remote-notification` is already in `app.json`, so that part is done; what is actually missing is the push capability/entitlement in the provisioning profile (Xcode or EAS credentials), not an `app.json` edit.
-- **`apps/api/.gitignore`** — Added `!.env.example` so the template file can be committed while `.env*` remains blocked.
-- **`apps/api/.env.example`** (new) — Blank template listing all required API env vars with placeholder values only.
+## What was just completed (2026-10-25)
 
----
+Revival only, no code changes: folder moved back, GitHub unarchived, Vercel unpaused and verified serving, workspace links restored, root `projects/CLAUDE.md` repo map and `archives/README.md` updated.
 
-## Open technical work
+## Blockers and open decisions
+
+1. **Supabase project is probably gone.** The project ref (found in `apps/mobile/.expo/dev/logs/start.log`, and the same one the env files point at) no longer resolves in DNS while `supabase.co` itself does. A paused free-tier project still answers; a non-existent hostname means the project was most likely deleted after sitting paused since June. **Owner action:** open the Supabase dashboard. If a restore option exists, restore it. If not, create a new project, apply both migrations in `supabase/migrations/` in order, and update the Supabase URL and keys in `apps/api/.env`, `apps/mobile/.env`, and the Vercel project env vars. Nothing in the app will work against the backend until this is done. Treat this as the standing finding, not something to re-probe each session; re-check only after the owner reports a dashboard action.
+2. Hardware: unchanged, bracelet has no ETA. Everything in "Open technical work" below still stands.
+
+## Open technical work (unchanged from archival)
 
 **Must do before the project can run on real hardware:**
 
-1. **Global BLE context** (code task, hardware-independent). `apps/mobile/app/(tabs)/index.tsx` calls `useMockBLE` directly with its own scan/connect-on-mount. It carries an unactioned `// Phase 5: replace useMockBLE with global BLE context from onboarding flow` TODO. No global BLE context exists. Build it first; without it, the home screen cannot share the BLE connection established in onboarding.
+1. **Global BLE context** (code task, hardware-independent). `apps/mobile/app/(tabs)/index.tsx` calls `useMockBLE` directly with its own scan/connect-on-mount and carries a `// Phase 5: replace useMockBLE with global BLE context from onboarding flow` TODO. No global BLE context exists. Build it first.
+2. **Two `useMockBLE` swap sites** (hardware-gated): `apps/mobile/app/onboarding/pair-bracelet.tsx` (straightforward) and `apps/mobile/app/(tabs)/index.tsx` (needs the context above first).
+3. **APNs credentials** (credential-gated). `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_PRIVATE_KEY` are `PLACEHOLDER`. Requires Apple Developer Program ($99/year). See `APNS_SETUP.md`.
+4. **`usePushToken` token type swap** to `getDevicePushTokenAsync()` for the raw APNs token when going live.
+5. **iOS build setup.** No `eas.json`. Needs Xcode on a Mac or EAS cloud build, plus the push capability in the provisioning profile.
 
-2. **Two `useMockBLE` swap sites** (hardware-gated). Once a real bracelet exists: swap `apps/mobile/app/onboarding/pair-bracelet.tsx` (marked, straightforward) and `apps/mobile/app/(tabs)/index.tsx` (requires the context above first).
+**Known deferred debt:** `packages/shared` is unused and `BeatEvent` is duplicated in four places (`useBLE.ts`, `useMockBLE.ts`, `backgroundBeatRelay.ts`, `relay/route.ts`). `useRelay`'s background branch pauses outbound forwarding; revisit when APNs goes live.
 
-3. **APNs credentials** (credential-gated). `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_PRIVATE_KEY` are `PLACEHOLDER` in `apps/api/.env`. Requires an Apple Developer account. See `APNS_SETUP.md` for the full sequence. Code is complete; it is inert until credentials exist and on-device verification runs.
+## Next steps, in priority order
 
-4. **`usePushToken` token type swap**. Currently registers an Expo push token; must switch to `getDevicePushTokenAsync()` for the raw APNs token when going live. Marked in-code and documented in `APNS_SETUP.md`.
+1. Owner resolves the Supabase blocker above (dashboard check, restore or recreate, env vars in three places).
+2. Verify the API end to end against the restored backend: `cd apps/api && npm run dev`, hit the relay route.
+3. Build the global BLE context (item 1 above), the only hardware-independent code task.
+4. Everything else waits on hardware and the Apple Developer account.
 
-5. **iOS build setup**. No `eas.json` exists. Building for a real iOS device requires either Xcode on a Mac or EAS cloud build. The `apps/mobile/app.json` iOS background modes are already correct (`remote-notification`, `bluetooth-central`). The missing piece is the push capability/entitlement in the provisioning profile, set via Xcode (Signing and Capabilities, Push Notifications) or EAS credentials.
+## Where everything lives
 
-**Known deferred debt (not blocking, but unresolved):**
+| Path | What it is |
+|---|---|
+| `apps/api/` | Next.js API, deployed to Vercel (root dir `apps/api`), `vercel.json` forces `npm install --legacy-peer-deps` |
+| `apps/mobile/` | Expo app |
+| `packages/shared/` | Unused shared types package (see debt) |
+| `supabase/migrations/` | Two migrations to apply to any new Supabase project |
+| `APNS_SETUP.md` | Push notification credential sequence |
+| `apps/api/.env.example` | Template of required API env vars |
 
-- `packages/shared` is unused. `BeatEvent` is duplicated in four places (`useBLE.ts`, `useMockBLE.ts`, `backgroundBeatRelay.ts`, `relay/route.ts`). Consolidating onto `@everglow/shared` is known debt, not yet scheduled.
-- `useRelay`'s background branch pauses outbound forwarding and sends a resting glow on background. When APNs goes live, this must be revisited to keep the real relay alive instead.
+## Operational landmines
 
----
+1. `apps/api/vercel.json` install command is a peer-dependency workaround; do not remove without re-checking the build.
+2. Moving this folder: `node_modules` workspace symlinks lock their targets. Use `robocopy /E /MOVE /XJ`, then `npm install --legacy-peer-deps` to recreate the three links. (Hit on archive 2026-10-21 and again on revive 2026-10-25.)
+3. The Vercel MCP server returns 404 for this project on get and unpause even though it appears in list. The Vercel CLI works: `vercel api "/v1/projects/<prj_id>/unpause?teamId=<team_id>" --method POST --scope timas-gudziunas-projects`. CLI 54.4.0 has no `project resume` subcommand.
+4. Supabase free-tier projects auto-pause after inactivity and can be deleted after a long pause. This is what appears to have happened here. If the project goes idle again, expect to lose it.
+5. No local `.vercel` link; deploys go through the GitHub integration on push to `main`.
+6. Both `apps/api/.env` and `apps/mobile/.env` are real and gitignored. Never print them.
 
-## Reviving this project
+## Quick health check
 
-A future session needs:
-
-1. Real bracelet hardware (PPG sensor, BLE, GATT profile as locked in `PLAN.md`). The GATT profile is frozen; firmware must match exactly.
-2. Apple Developer account for APNs auth key (`.p8`).
-3. Read `CLAUDE.md` "Resuming when hardware arrives" section — it is a terse checklist written for exactly this moment.
-4. The Supabase project should still be live (free tier). Verify the two migrations in `supabase/migrations/` are applied.
-5. Check the Vercel deployment (see below).
-
----
-
-## External side effects
-
-**No Windows scheduled task ever existed** for this project.
-
-**No GitHub Actions cron ever existed** for this project (no `.github/workflows/` directory).
-
-**Vercel: PAUSED (2026-10-21).** The Vercel project `everglow-app` (team `timas-gudziunas-projects`) exists, is git-connected to GitHub `main`, and had a live production deployment from commit `7850d4b` (2026-06-11) serving `everglow-app.vercel.app`. The owner paused it from Project Settings on 2026-10-21; the domain now returns 503 DEPLOYMENT_PAUSED. Env vars, domains and deployment history are kept. To revive: unarchive the GitHub repo, then Resume Project in Vercel settings. `apps/api/vercel.json` sets `"installCommand": "npm install --legacy-peer-deps"` (a peer-dependency conflict workaround, do not remove without re-checking). There is no `.vercel` directory locally; the project was deployed through the GitHub integration, never linked from this machine.
-
----
-
-## Paid and credit-consuming services
-
-- **Supabase** (free tier as of last active development). If the project has been idle since June 2026 and the free org has no other active projects, Supabase may pause the database. Check the dashboard.
-- **Ably** (free tier, 6M messages/month). No active traffic since June 2026 so no charges expected, but the account and API key in `apps/api/.env` are live.
-- **Apple Developer Program** ($99/year). Not yet purchased as of archival. Required before APNs can be configured.
-- **Expo EAS** (no `eas.json` exists, so no EAS build has been run). No charges.
-- **Resend**: not used by this project.
-- **Vercel**: Hobby plan, project paused 2026-10-21. No charges.
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" https://everglow-app.vercel.app/      # 200
+gh repo view timasgudziunas/everglow-app --json isArchived                      # false
+nslookup xrjrpwggwcguxrbrotwm.supabase.co                                        # resolves once Supabase is fixed
+ls node_modules/api node_modules/mobile node_modules/@everglow/shared -d         # three links present
+```
+Healthy = Vercel 200, repo not archived, Supabase host resolves, three workspace links present. As of 2026-10-25 only the Supabase line fails.
